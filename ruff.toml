@@ -1,0 +1,43 @@
+exclude = [
+    ".eggs",
+    ".git",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    ".pytest_cache",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "migrations",
+]
+
+line-length = 120
+indent-width = 4
+
+[lint]
+select = ["ALL"]
+ignore = [
+    "D1",
+    "D203",
+    "D212",
+    "PTH123",
+    "PERF203",
+    "RUF001",
+    "FA102",
+    "FIX002",
+    "TD",
+    "PLR0913",
+    "INP001",
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "S101",
+    "S311",
+    "F811",
+    "ARG002",
+    "FBT001",
+    "PLR0915",
+]
