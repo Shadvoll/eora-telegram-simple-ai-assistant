@@ -9,6 +9,6 @@ class AnswerUseCase:
     ) -> None:
         self.ai_service = ai_service
 
-    async def execute(self, user_message: str) -> str:
-        return await self.ai_service.generate_response(user_message)
+    async def execute(self, user_message: str, user_id: str) -> str:
+        return self.ai_service.generate_response(user_message, user_id=user_id)
 

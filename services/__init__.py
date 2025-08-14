@@ -1,6 +1,6 @@
-from services.yandex_ai import YandexAiService, YandexAiServiceParams
+from services.yandex_ai import YandexAiAssistantService, YandexAiServiceParams
 
 __all__ = [
-    "YandexAiService",
+    "YandexAiAssistantService",
     "YandexAiServiceParams",
 ]

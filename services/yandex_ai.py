@@ -1,48 +1,57 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import httpx
+from yandex_cloud_ml_sdk import YCloudML
 
 from repositories.ai_context import SystemPrompt
-from services.interfaces import AiService, AiServiceParams
+from services.interfaces import AiService
+
+if TYPE_CHECKING:
+    from yandex_cloud_ml_sdk._threads.domain import Threads
 
 
 @dataclass
-class YandexAiServiceParams(AiServiceParams):
+class YandexAiServiceParams:
     api_key: str
     folder_id: str
     system_prompt: SystemPrompt
 
 
-class YandexAiService(AiService):
-
-    YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+class YandexAiAssistantService(AiService):
+    BASE_URL = "https://rest-assistant.api.cloud.yandex.net"
 
     def __init__(self, params: YandexAiServiceParams) -> None:
-        self.api_key = params.api_key
-        self.folder_id = params.folder_id
-        self.system_prompt = params.system_prompt.text_data
+        self.sdk = YCloudML(
+            folder_id=params.folder_id,
+            auth=params.api_key,
+        )
+        model = self.sdk.models.completions("yandexgpt", model_version="rc")
+        self.assistant = self.sdk.assistants.create(
+            model,
+            instruction=params.system_prompt.text_data,
+            ttl_days=1,
+            expiration_policy="since_last_active",
+            max_tokens=500,
+        )
+        self._threads: dict[str, Threads] = {}
 
-    async def generate_response(self, request_prompt: str) -> str:
-        headers = {
-            "Authorization": f"Api-Key {self.api_key}",
-            "Content-Type": "application/json",
-            "x-folder-id": self.folder_id,
-        }
-        payload = {
-            "modelUri": f"gpt://{self.folder_id}/yandexgpt/latest",
-            "completionOptions": {
-                "stream": False,
-                "temperature": 0.6,
-                "maxTokens": 2000,
-            },
-            "messages": [
-                {"role": "system", "text": self.system_prompt},
-                {"role": "user", "text": request_prompt},
-            ],
-        }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(self.YANDEX_GPT_URL, headers=headers, json=payload, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            # Ответ содержит список choices, берем первый
-            return data["result"]["alternatives"][0]["message"]["text"]
+    def generate_response(self, user_message: str, user_id: str) -> str:
+        if user_id not in self._threads:
+            user_thread: Threads = self.sdk.threads.create(
+                name="yandex-ai-assistant",
+                ttl_days=1,
+                expiration_policy="static",
+            )
+            self._threads[user_id] = user_thread
+        else:
+            user_thread: Threads = self._threads[user_id]
+
+        user_thread.write(user_message)
+        run = self.assistant.run(user_thread)
+        return " ".join(run.wait().parts)
+
+
+    def __del__(self) -> None:
+        for user_id in self._threads:
+            self._threads[user_id].delete()
+        self.assistant.delete()
